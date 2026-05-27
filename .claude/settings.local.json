@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter pub *)",
+      "Bash(flutter analyze *)",
+      "Bash(flutter doctor *)",
+      "Bash(flutter devices *)",
+      "Bash(flutter run *)",
+      "Bash(tee flutter-android-run.log)",
+      "WebFetch(domain:pub.dev)",
+      "WebSearch",
+      "Bash(flutter --version)",
+      "Bash(flutter create *)",
+      "Read(//tmp/fl_template_check/tmpcheck/android/**)",
+      "Read(//tmp/fl_template_check/tmpcheck/android/app/**)",
+      "Read(//tmp/fl_tmpl/android/**)",
+      "Read(//tmp/fl_tmpl/android/gradle/wrapper/**)"
+    ]
+  }
+}
