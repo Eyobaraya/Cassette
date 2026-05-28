@@ -70,55 +70,41 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         const SizedBox(height: 16),
                         _ProgressBar(musicService: widget.musicService),
                         const SizedBox(height: 16),
-                        Stack(
-                          alignment: Alignment.center,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  iconSize: 40,
-                                  onPressed: widget.musicService.previousSong,
-                                  icon: const Icon(Icons.skip_previous),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton.filled(
-                                  iconSize: 44,
-                                  onPressed: widget.musicService.togglePlayPause,
-                                  icon: Icon(
-                                    widget.musicService.isPlaying
-                                        ? Icons.pause
-                                        : Icons.play_arrow,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  iconSize: 40,
-                                  onPressed: widget.musicService.nextSong,
-                                  icon: const Icon(Icons.skip_next),
-                                ),
-                              ],
+                            IconButton(
+                              onPressed: widget.musicService.toggleLoop,
+                              color: widget.musicService.loopOne
+                                  ? Theme.of(context).colorScheme.primary
+                                  : null,
+                              icon: const Icon(Icons.repeat_one),
                             ),
-                            Positioned(
-                              left: 0,
-                              child: IconButton(
-                                onPressed: widget.musicService.toggleLoop,
-                                color: widget.musicService.loopOne
-                                    ? Theme.of(context).colorScheme.primary
-                                    : null,
-                                icon: const Icon(Icons.repeat_one),
+                            IconButton(
+                              iconSize: 40,
+                              onPressed: widget.musicService.previousSong,
+                              icon: const Icon(Icons.skip_previous),
+                            ),
+                            IconButton.filled(
+                              iconSize: 44,
+                              onPressed: widget.musicService.togglePlayPause,
+                              icon: Icon(
+                                widget.musicService.isPlaying
+                                    ? Icons.pause
+                                    : Icons.play_arrow,
                               ),
                             ),
-                            Positioned(
-                              right: 0,
-                              child: IconButton(
-                                onPressed: widget.musicService.toggleShuffle,
-                                color: widget.musicService.shuffle
-                                    ? Theme.of(context).colorScheme.primary
-                                    : null,
-                                icon: const Icon(Icons.shuffle),
-                              ),
+                            IconButton(
+                              iconSize: 40,
+                              onPressed: widget.musicService.nextSong,
+                              icon: const Icon(Icons.skip_next),
+                            ),
+                            IconButton(
+                              onPressed: widget.musicService.toggleShuffle,
+                              color: widget.musicService.shuffle
+                                  ? Theme.of(context).colorScheme.primary
+                                  : null,
+                              icon: const Icon(Icons.shuffle),
                             ),
                           ],
                         ),
