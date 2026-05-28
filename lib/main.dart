@@ -9,21 +9,21 @@ import 'theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.example.simple_trial.channel.audio',
-    androidNotificationChannelName: 'Simple Trial playback',
+    androidNotificationChannelId: 'com.example.cassette.channel.audio',
+    androidNotificationChannelName: 'Cassette playback',
     androidNotificationOngoing: true,
   );
-  runApp(const SimpleTrialApp());
+  runApp(const CassetteApp());
 }
 
-class SimpleTrialApp extends StatefulWidget {
-  const SimpleTrialApp({super.key});
+class CassetteApp extends StatefulWidget {
+  const CassetteApp({super.key});
 
   @override
-  State<SimpleTrialApp> createState() => _SimpleTrialAppState();
+  State<CassetteApp> createState() => _CassetteAppState();
 }
 
-class _SimpleTrialAppState extends State<SimpleTrialApp> {
+class _CassetteAppState extends State<CassetteApp> {
   final storageService = StorageService();
   late final musicService = MusicService(storageService);
   bool darkMode = true;

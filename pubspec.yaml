@@ -1,5 +1,5 @@
-name: simple_trial
-description: "A new Flutter project."
+name: cassette
+description: "Cassette - a simple offline music player."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -39,11 +39,11 @@ dependencies:
   file_picker: ^11.0.2
   shared_preferences: ^2.5.5
   on_audio_query_pluse: ^3.0.6
-  google_fonts: ^8.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.4
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -55,6 +55,14 @@ dev_dependencies:
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/branding/logo.png"
+  min_sdk_android: 24
+  adaptive_icon_background: "#E8743B"
+  adaptive_icon_foreground: "assets/branding/logo.png"
+
 # The following section is specific to Flutter packages.
 flutter:
 
@@ -62,6 +70,14 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-VariableFont_wght.ttf
+    - family: Righteous
+      fonts:
+        - asset: assets/fonts/Righteous-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

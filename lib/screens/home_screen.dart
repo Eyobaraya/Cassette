@@ -28,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int selectedIndex = 0;
   SongSortOption sortOption = SongSortOption.recentlyAdded;
+  String? _shownError;
 
   @override
   void initState() {
@@ -42,7 +43,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _refresh() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    final error = widget.musicService.lastError;
+    if (error != null && error != _shownError) {
+      _shownError = error;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    }
   }
 
   @override
@@ -82,6 +89,14 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           if (busy) const LinearProgressIndicator(minHeight: 3),
+          if (widget.musicService.isScanningLibrary)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Text(
+                'Scanning device... ${widget.musicService.lastScanAddedCount} songs found',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
           Expanded(child: pages[selectedIndex]),
           MiniPlayer(
             musicService: widget.musicService,
@@ -117,6 +132,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _sortSongs(visibleSongs);
 
     if (widget.musicService.songs.isEmpty) {
+      if (widget.musicService.isScanningLibrary) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Scanning your device for music...',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
+      }
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

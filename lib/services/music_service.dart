@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
@@ -49,6 +51,14 @@ class MusicService extends ChangeNotifier {
     playlists = await storageService.loadPlaylists();
     _idCounter = songs.length;
     notifyListeners();
+
+    if (supportsLibraryScan) {
+      final alreadyScanned = await storageService.loadAutoScanned();
+      if (!alreadyScanned) {
+        await scanDeviceLibrary();
+        await storageService.saveAutoScanned(true);
+      }
+    }
   }
 
   Future<void> pickSongsFromComputer() async {
@@ -90,6 +100,7 @@ class MusicService extends ChangeNotifier {
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   Future<void> scanDeviceLibrary() async {
+    debugPrint('scanDeviceLibrary: called (supports=$supportsLibraryScan, busy=$isScanningLibrary)');
     if (!supportsLibraryScan || isScanningLibrary) return;
 
     isScanningLibrary = true;
@@ -98,24 +109,58 @@ class MusicService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final granted = await _audioQuery.checkAndRequest(retryRequest: true);
-      if (!granted) {
+      debugPrint('scanDeviceLibrary: checking permission');
+      var hasPermission = await _audioQuery.permissionsStatus();
+      debugPrint('scanDeviceLibrary: hasPermission=$hasPermission');
+      if (!hasPermission) {
+        hasPermission = await _audioQuery.permissionsRequest();
+        debugPrint('scanDeviceLibrary: requested -> $hasPermission');
+      }
+      if (!hasPermission) {
         lastError = 'Audio library permission was denied.';
         return;
       }
 
+      debugPrint('scanDeviceLibrary: calling querySongs');
       final results = await _audioQuery.querySongs(
         sortType: SongSortType.DATE_ADDED,
         orderType: OrderType.DESC_OR_GREATER,
         uriType: UriType.EXTERNAL,
         ignoreCase: true,
       );
+      debugPrint('querySongs returned ${results.length} entries');
+      if (results.isNotEmpty) {
+        final sample = results.take(3).map((r) =>
+            '{title="${r.title}", isMusic=${r.isMusic}, dur=${r.duration}, data="${r.data}"}').join(', ');
+        debugPrint('querySongs sample: $sample');
+      }
+
+      results.sort((a, b) {
+        final pa = _folderPriority(a.data);
+        final pb = _folderPriority(b.data);
+        return pa.compareTo(pb);
+      });
 
       final existingUrls = songs.map((s) => s.url).toSet();
       var added = 0;
+      var skippedNotMusic = 0;
+      var skippedTooShort = 0;
+      var skippedDuplicate = 0;
+      const minDurationMs = 10000;
       for (final entry in results) {
+        if (entry.isMusic != true) {
+          skippedNotMusic++;
+          continue;
+        }
+        if ((entry.duration ?? 0) < minDurationMs) {
+          skippedTooShort++;
+          continue;
+        }
         final url = entry.uri ?? entry.data;
-        if (url.isEmpty || existingUrls.contains(url)) continue;
+        if (url.isEmpty || existingUrls.contains(url)) {
+          skippedDuplicate++;
+          continue;
+        }
         existingUrls.add(url);
         songs.add(
           Song(
@@ -127,7 +172,14 @@ class MusicService extends ChangeNotifier {
           ),
         );
         added++;
+
+        if (added % 10 == 0) {
+          lastScanAddedCount = added;
+          notifyListeners();
+          await Future<void>.delayed(Duration.zero);
+        }
       }
+      debugPrint('scan filter: added=$added, notMusic=$skippedNotMusic, tooShort=$skippedTooShort, dup=$skippedDuplicate');
 
       lastScanAddedCount = added;
       if (added > 0) {
@@ -159,16 +211,60 @@ class MusicService extends ChangeNotifier {
     notifyListeners();
 
     final song = queueSongs[queueIndex];
+    if (_isLocalFileMissing(song)) {
+      await _removeMissingSong(song, 'File not found on disk.');
+      return;
+    }
+
     try {
       await player.stop();
       await _setSource(song);
       await player.setVolume(volume);
       await player.play();
     } catch (e, st) {
-      lastError = 'Could not play "${song.title}": $e';
       debugPrint('Failed to play "${song.title}" (${song.url}): $e\n$st');
-      notifyListeners();
+      if (_isLocalFileMissing(song)) {
+        await _removeMissingSong(song, 'File not found on disk.');
+      } else {
+        lastError = 'Could not play "${song.title}": $e';
+        notifyListeners();
+      }
     }
+  }
+
+  bool _isLocalFileMissing(Song song) {
+    if (kIsWeb) return false;
+    final uri = Uri.tryParse(song.url);
+    final scheme = uri?.scheme.toLowerCase() ?? '';
+    if (scheme == 'http' ||
+        scheme == 'https' ||
+        scheme == 'content' ||
+        scheme == 'blob') {
+      return false;
+    }
+    final path = scheme == 'file' ? uri!.toFilePath() : song.url;
+    return !File(path).existsSync();
+  }
+
+  Future<void> _removeMissingSong(Song song, String reason) async {
+    songs.removeWhere((s) => s.id == song.id);
+    queueSongs.removeWhere((s) => s.id == song.id);
+    if (queueIndex >= queueSongs.length) {
+      queueIndex = queueSongs.isEmpty ? -1 : queueSongs.length - 1;
+    }
+    favoriteSongIds.remove(song.id);
+    for (var i = 0; i < playlists.length; i++) {
+      final filtered =
+          playlists[i].songIds.where((id) => id != song.id).toList();
+      if (filtered.length != playlists[i].songIds.length) {
+        playlists[i] = playlists[i].copyWith(songIds: filtered);
+      }
+    }
+    await storageService.saveSongs(songs);
+    await storageService.saveFavorites(favoriteSongIds);
+    await storageService.savePlaylists(playlists);
+    lastError = '${song.title}: $reason Removed from library.';
+    notifyListeners();
   }
 
   Future<void> _setSource(Song song) async {
@@ -314,5 +410,19 @@ class MusicService extends ChangeNotifier {
     _idCounter++;
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     return '${timestamp}_${_idCounter}_${url.hashCode}_${title.hashCode}';
+  }
+
+  static const _priorityFolders = [
+    '/music/',
+    '/download/',
+    '/downloads/',
+  ];
+
+  int _folderPriority(String path) {
+    final lower = path.toLowerCase();
+    for (final folder in _priorityFolders) {
+      if (lower.contains(folder)) return 0;
+    }
+    return 1;
   }
 }

@@ -10,6 +10,7 @@ class StorageService {
   static const favoritesKey = 'favorites';
   static const playlistsKey = 'playlists';
   static const darkModeKey = 'dark_mode';
+  static const autoScannedKey = 'auto_scanned';
 
   Future<List<Song>> loadSongs() async {
     final prefs = await SharedPreferences.getInstance();
@@ -65,5 +66,15 @@ class StorageService {
   Future<void> saveDarkMode(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(darkModeKey, value);
+  }
+
+  Future<bool> loadAutoScanned() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(autoScannedKey) ?? false;
+  }
+
+  Future<void> saveAutoScanned(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(autoScannedKey, value);
   }
 }
