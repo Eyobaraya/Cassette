@@ -183,12 +183,6 @@ class MusicService extends ChangeNotifier {
     }
   }
 
-  Future<void> playSong(Song song) async {
-    final index = songs.indexWhere((item) => item.id == song.id);
-    if (index == -1) return;
-    await playFromList(songs, index);
-  }
-
   String? lastError;
 
   Future<void> playFromList(List<Song> list, int index) async {
