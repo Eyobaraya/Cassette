@@ -44,12 +44,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _refresh() {
     if (!mounted) return;
-    setState(() {});
-    final error = widget.musicService.lastError;
-    if (error != null && error != _shownError) {
-      _shownError = error;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {});
+      final error = widget.musicService.lastError;
+      if (error != null && error != _shownError) {
+        _shownError = error;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      }
+    });
   }
 
   @override
@@ -234,6 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () => widget.musicService.playFromList(visibleSongs, index),
                 onFavoriteTap: () => widget.musicService.toggleFavorite(song),
                 onAddToPlaylistTap: () => _showPlaylistPicker(song),
+                onRemoveTap: () => _confirmRemoveSong(song),
               );
             },
           ),
@@ -313,41 +317,87 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showCreatePlaylistDialog(Song song) async {
-    final controller = TextEditingController();
-
-    await showDialog(
+  Future<void> _confirmRemoveSong(Song song) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('New playlist'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: 'Playlist name'),
+          title: const Text('Remove song?'),
+          content: Text(
+            '"${song.title}" will be removed from your library, favorites, and any playlists. The file on your device is not deleted.',
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(context, false),
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () async {
-                await widget.musicService.createPlaylist(controller.text);
-                final playlist = widget.musicService.playlists.lastOrNull;
-                if (playlist != null) {
-                  await widget.musicService.addSongToPlaylist(song, playlist);
-                }
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Create'),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Remove'),
             ),
           ],
         );
       },
     );
 
-    controller.dispose();
+    if (confirmed != true) return;
+    await WidgetsBinding.instance.endOfFrame;
+    await widget.musicService.removeSongFromLibrary(song);
+  }
+
+  Future<void> _showCreatePlaylistDialog(Song song) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => const _CreatePlaylistDialog(),
+    );
+
+    if (name == null || name.trim().isEmpty) return;
+    await WidgetsBinding.instance.endOfFrame;
+    await widget.musicService.createPlaylist(name);
+    final playlist = widget.musicService.playlists.lastOrNull;
+    if (playlist != null) {
+      await widget.musicService.addSongToPlaylist(song, playlist);
+    }
+  }
+}
+
+class _CreatePlaylistDialog extends StatefulWidget {
+  const _CreatePlaylistDialog();
+
+  @override
+  State<_CreatePlaylistDialog> createState() => _CreatePlaylistDialogState();
+}
+
+class _CreatePlaylistDialogState extends State<_CreatePlaylistDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New playlist'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: 'Playlist name'),
+        onSubmitted: (value) => Navigator.pop(context, value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Create'),
+        ),
+      ],
+    );
   }
 }
 

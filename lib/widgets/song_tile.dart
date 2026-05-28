@@ -10,6 +10,7 @@ class SongTile extends StatelessWidget {
     required this.onTap,
     required this.onFavoriteTap,
     required this.onAddToPlaylistTap,
+    required this.onRemoveTap,
   });
 
   final Song song;
@@ -17,6 +18,7 @@ class SongTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onFavoriteTap;
   final VoidCallback onAddToPlaylistTap;
+  final VoidCallback onRemoveTap;
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +40,29 @@ class SongTile extends StatelessWidget {
             onPressed: onFavoriteTap,
             icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
           ),
-          IconButton(
-            tooltip: 'Add to playlist',
-            onPressed: onAddToPlaylistTap,
-            icon: const Icon(Icons.playlist_add),
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'playlist') onAddToPlaylistTap();
+              if (value == 'remove') onRemoveTap();
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'playlist',
+                child: ListTile(
+                  leading: Icon(Icons.playlist_add),
+                  title: Text('Add to playlist'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'remove',
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Remove from library'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -250,6 +250,30 @@ class MusicService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> removeSongFromLibrary(Song song) async {
+    final wasCurrent = currentSong?.id == song.id;
+    if (wasCurrent) {
+      await player.stop();
+    }
+    songs.removeWhere((s) => s.id == song.id);
+    queueSongs.removeWhere((s) => s.id == song.id);
+    if (queueIndex >= queueSongs.length) {
+      queueIndex = queueSongs.isEmpty ? -1 : queueSongs.length - 1;
+    }
+    favoriteSongIds.remove(song.id);
+    for (var i = 0; i < playlists.length; i++) {
+      final filtered =
+          playlists[i].songIds.where((id) => id != song.id).toList();
+      if (filtered.length != playlists[i].songIds.length) {
+        playlists[i] = playlists[i].copyWith(songIds: filtered);
+      }
+    }
+    await storageService.saveSongs(songs);
+    await storageService.saveFavorites(favoriteSongIds);
+    await storageService.savePlaylists(playlists);
+    notifyListeners();
+  }
+
   Future<void> _setSource(Song song) async {
     final tag = MediaItem(
       id: song.id,
