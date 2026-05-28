@@ -2,9 +2,10 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-import 'package:on_audio_query_pluse/on_audio_query.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models/playlist.dart';
 import '../models/song.dart';
@@ -29,12 +30,13 @@ class MusicService extends ChangeNotifier {
   List<Song> queueSongs = [];
   int queueIndex = -1;
   bool loopOne = false;
+  bool shuffle = false;
   double volume = 1;
   bool isPickingSongs = false;
   bool isScanningLibrary = false;
   int lastScanAddedCount = 0;
   int _idCounter = 0;
-  final OnAudioQuery _audioQuery = OnAudioQuery();
+  static const _mediaStoreChannel = MethodChannel('cassette/media_store');
 
   Song? get currentSong {
     if (queueIndex < 0 || queueIndex >= queueSongs.length) return null;
@@ -109,54 +111,41 @@ class MusicService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('scanDeviceLibrary: checking permission');
-      var hasPermission = await _audioQuery.permissionsStatus();
-      debugPrint('scanDeviceLibrary: hasPermission=$hasPermission');
-      if (!hasPermission) {
-        hasPermission = await _audioQuery.permissionsRequest();
-        debugPrint('scanDeviceLibrary: requested -> $hasPermission');
+      debugPrint('scanDeviceLibrary: checking audio permission');
+      var status = await Permission.audio.status;
+      debugPrint('scanDeviceLibrary: audio status=$status');
+      if (!status.isGranted) {
+        status = await Permission.audio.request();
+        debugPrint('scanDeviceLibrary: requested -> $status');
       }
-      if (!hasPermission) {
+      if (!status.isGranted) {
         lastError = 'Audio library permission was denied.';
         return;
       }
 
-      debugPrint('scanDeviceLibrary: calling querySongs');
-      final results = await _audioQuery.querySongs(
-        sortType: SongSortType.DATE_ADDED,
-        orderType: OrderType.DESC_OR_GREATER,
-        uriType: UriType.EXTERNAL,
-        ignoreCase: true,
-      );
-      debugPrint('querySongs returned ${results.length} entries');
-      if (results.isNotEmpty) {
-        final sample = results.take(3).map((r) =>
-            '{title="${r.title}", isMusic=${r.isMusic}, dur=${r.duration}, data="${r.data}"}').join(', ');
-        debugPrint('querySongs sample: $sample');
-      }
+      debugPrint('scanDeviceLibrary: calling native queryAudio');
+      final raw = await _mediaStoreChannel.invokeMethod<List<dynamic>>('queryAudio');
+      final results = (raw ?? const <dynamic>[]).cast<Map<dynamic, dynamic>>();
+      debugPrint('queryAudio returned ${results.length} entries');
 
       results.sort((a, b) {
-        final pa = _folderPriority(a.data);
-        final pb = _folderPriority(b.data);
+        final pa = _folderPriority((a['data'] as String?) ?? '');
+        final pb = _folderPriority((b['data'] as String?) ?? '');
         return pa.compareTo(pb);
       });
 
       final existingUrls = songs.map((s) => s.url).toSet();
       var added = 0;
-      var skippedNotMusic = 0;
       var skippedTooShort = 0;
       var skippedDuplicate = 0;
       const minDurationMs = 10000;
       for (final entry in results) {
-        if (entry.isMusic != true) {
-          skippedNotMusic++;
-          continue;
-        }
-        if ((entry.duration ?? 0) < minDurationMs) {
+        final duration = (entry['duration'] as num?)?.toInt() ?? 0;
+        if (duration < minDurationMs) {
           skippedTooShort++;
           continue;
         }
-        final url = entry.uri ?? entry.data;
+        final url = (entry['uri'] as String?) ?? (entry['data'] as String?) ?? '';
         if (url.isEmpty || existingUrls.contains(url)) {
           skippedDuplicate++;
           continue;
@@ -164,10 +153,10 @@ class MusicService extends ChangeNotifier {
         existingUrls.add(url);
         songs.add(
           Song(
-            id: 'mediastore_${entry.id}',
-            title: entry.title,
-            artist: entry.artist ?? 'Unknown artist',
-            duration: Duration(milliseconds: entry.duration ?? 0),
+            id: 'mediastore_${entry['id']}',
+            title: (entry['title'] as String?) ?? 'Unknown',
+            artist: (entry['artist'] as String?) ?? 'Unknown artist',
+            duration: Duration(milliseconds: duration),
             url: url,
           ),
         );
@@ -179,7 +168,7 @@ class MusicService extends ChangeNotifier {
           await Future<void>.delayed(Duration.zero);
         }
       }
-      debugPrint('scan filter: added=$added, notMusic=$skippedNotMusic, tooShort=$skippedTooShort, dup=$skippedDuplicate');
+      debugPrint('scan filter: added=$added, tooShort=$skippedTooShort, dup=$skippedDuplicate');
 
       lastScanAddedCount = added;
       if (added > 0) {
@@ -306,6 +295,16 @@ class MusicService extends ChangeNotifier {
   Future<void> nextSong() async {
     if (queueSongs.isEmpty) return;
 
+    if (shuffle && queueSongs.length > 1) {
+      var next = queueIndex;
+      while (next == queueIndex) {
+        next = (queueSongs.length * (DateTime.now().microsecondsSinceEpoch % 1000) / 1000).floor();
+      }
+      queueIndex = next;
+      await playFromList(queueSongs, queueIndex);
+      return;
+    }
+
     final nextIndex = queueIndex + 1;
     queueIndex = nextIndex >= queueSongs.length ? 0 : nextIndex;
     await playFromList(queueSongs, queueIndex);
@@ -322,6 +321,11 @@ class MusicService extends ChangeNotifier {
   Future<void> toggleLoop() async {
     loopOne = !loopOne;
     await player.setLoopMode(loopOne ? LoopMode.one : LoopMode.off);
+    notifyListeners();
+  }
+
+  void toggleShuffle() {
+    shuffle = !shuffle;
     notifyListeners();
   }
 
