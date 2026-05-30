@@ -1,6 +1,11 @@
 # Cassette
 
 A simple, offline, ad-free music player for Android, built with Flutter. Cassette scans your phone's local audio files, lets you build playlists and favorites, and plays in the background with full lock-screen and notification controls.
+Group 42:
+Eyob Araya – UGR/8387/15
+Dagim Ameha – UGR/9384/15
+Desalegn Deribe – UGR/3992/15
+Kalab Tadesse – UGR/1277/15
 
 ## Features
 
